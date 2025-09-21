@@ -1,14 +1,14 @@
 # HMDB Metabolite Explorer
 
 A web-based interactive application built with **Shiny for Python** that enables exploration, filtering, and visualization of metabolite data.  
-The tool focuses on **natural product classifications, lipid taxonomies, and biological properties**, providing an intuitive interface for researchers and analysts.
+The tool focuses on **natural product classifications, lipid taxonomies, and biological properties**, providing an intuitive interface for researchers and analysts.  
 
----
+The app now supports **automatic dataset updates** through the Admin Panel. Local dataset versions are extracted dynamically from the Parquet filename, and update checks compare them with the latest HMDB and LIPID MAPS releases. A dedicated test dataset is included for verifying the update workflow.
+
 
 ## License
 This project is licensed under the terms of the [GNU General Public License v3.0](LICENSE).
 
----
 
 ## Features
 
@@ -24,23 +24,24 @@ This project is licensed under the terms of the [GNU General Public License v3.0
 - **Detailed information panel**  
   Displays taxonomy and external database links for selected metabolites.  
 
----
+- **Admin Panel**  
+  - Upload and preview new Parquet datasets  
+  - Run the enrichment pipeline for dataset updates  
+  - Check online database versions against local files  
+  - Dynamic loading of datasets with automatic version parsing  
 
-## Recent Updates (2025-07-31)
 
-- Added "not classified" bar to bar chart  
-- Changed pie chart to bar chart  
-- Removed `"TOP {number}"` label in bar chart  
-- Reordered plots  
-- Added `LM | Main Class` as column in DataGrid  
-- Renamed taxonomy columns in DataGrid  
-- Removed custom CSS for the admin panel  
+## Recent Updates (2025-09-21)
 
----
+- Added **update card** in Admin Panel to check online dataset versions  
+- Integrated **run_pipeline.py** with Admin Panel for automated dataset updates  
+- Enabled **dynamic parquet file loading** with version extraction from filenames  
+- Added **test dataset** to validate Admin Panel update function  
+
 
 ## Usage
 
-1. Prepare the required **Parquet file** with metabolite data.  
+1. Prepare or update the required **Parquet file** using the enrichment pipeline.  
 2. Run the application:  
 
    ```bash
@@ -49,8 +50,8 @@ This project is licensed under the terms of the [GNU General Public License v3.0
 
 3. Use the filter panel to refine results.  
 4. Explore statistics, browse the DataGrid, and inspect detailed entries.  
+5. Use the **Admin Panel** to upload datasets, run updates, or check for new HMDB and LIPID MAPS versions.  
 
----
 
 ## Requirements
 
@@ -60,14 +61,14 @@ Install the required dependencies before running the application:
 pip install shiny shinywidgets pandas numpy plotly faicons
 ```
 
----
+
 
 ## To Do
 
 - Freeze/fix first column in the DataGrid  
-- Add integration for automatic dataset updates in the Admin Panel  
+- Adopt the url in the collect-raw-data.py script from csf_ to hmdb_
+- Implement console view in admin panel to show output of the pipeline run
 
----
 
 ## Resources
 
@@ -79,4 +80,3 @@ pip install shiny shinywidgets pandas numpy plotly faicons
 - [ChEBI](https://www.ebi.ac.uk/chebi/)  
 - [NPClassifier](https://npclassifier.gnps2.org/)  
 - [ClassyFire](http://classyfire.wishartlab.com/)  
-
