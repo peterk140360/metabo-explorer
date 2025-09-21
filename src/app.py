@@ -11,6 +11,10 @@
 #                           add LM | Main Class as column in datagrid
 #                           change name for taxonomy columns in datagrid
 #                           no custom CSS for admin panel
+#              2025-09-21  
+#                           add update card in admin panel
+#                           run pipeline for dataset update
+#                           dynamic parquet file loading
 #
 # Description: The "HMDB Metabolite Explorer" is a web-based interactive
 #              application built with Shiny for Python. It allows users to
@@ -23,19 +27,30 @@
 #                   * Interactive visualizations (bar chart, histogram, pie chart)
 #                   * Searchable and styled DataGrid with export functionality
 #                   * Detailed information panel with taxonomy and external links
+#                   * Admin panel with dataset management tools:
+#                         - Update card to check for new dataset versions online
+#                         - Trigger pipeline run for refreshing datasets
+#                         - Dynamic parquet file loading and version parsing
 #
-# Usage:       1. Prepare the required Parquet file with metabolite data.
-#              2. Run the app using: `shiny run --reload app.py`
+# Usage:       1. Prepare or update the required Parquet file using the provided
+#                 enrichment pipeline.
+#              2. Run the app using:
+#                     shiny run --reload app.py
 #              3. Use the filter panel to narrow down results.
 #              4. View statistics, browse the data grid, and inspect detailed entries.
+#              5. Use the Admin Panel to upload new datasets, check update status,
+#                 or re-run the pipeline.
 #
-# Comments:    * Requires the following Python packages: shiny, shinywidgets,
-#                pandas, numpy, plotly, faicons.
-#              * Ensure that the Parquet data file is properly formatted and
-#                includes expected columns for filtering and display.
+# Comments:    * Requires the following Python packages:
+#                   shiny, shinywidgets, pandas, numpy, plotly, faicons
+#              * Ensure that the Parquet file naming scheme includes dataset
+#                versions (e.g. 2021-11-17_hmdb_metabolites_classy_np_lm_2025-09-21_v5.parquet).
+#              * The app extracts local dataset versions dynamically from the
+#                filename for consistency with online checks.
 #
 # Todo:        * freeze/fix first column in the datagrid
-#              * Integration for automatic dataset update in Admin Panel 
+#              * adopt the url in the collect-raw-data.py script from csf_ to hmdb_
+#              * implement console view in admin panel to show output of the pipeline run
 #
 # Resources:   https://shiny.posit.co/py/
 #              https://plotly.com/python/
@@ -52,11 +67,16 @@
 # Imports
 # ---------------------------------------
 # Standard library
+import re
+import os
+import sys
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import subprocess
 from faicons import icon_svg
 from pathlib import Path
+import urllib.request
 
 # Shiny framework
 from shiny import reactive
@@ -67,10 +87,23 @@ from shinywidgets import render_plotly
 # ---------------------------------------
 # Constants and Configuration
 # ---------------------------------------
-# Parquet file path
-DATA_PATH = (
-    Path(__file__).parent / "data" / "metabolites_enr_edit_np_lipidmaps_test.parquet"
-)
+# Parquet file path dynamically
+data_dir = Path(__file__).parent.parent / "data"
+parquet_files = list(data_dir.glob("*.parquet"))
+
+if not parquet_files:
+    raise FileNotFoundError(f"No .parquet files found in {data_dir}")
+
+# Pick the most recently modified parquet file
+DATA_PATH = max(parquet_files, key=lambda f: f.stat().st_mtime)
+
+print(f"Using Parquet file: {DATA_PATH}")
+
+# DATA_PATH = (
+#     # Path(__file__).parent.parent / "data" / "metabolites_enr_edit_np_lipidmaps_test.parquet"
+#     Path(__file__).parent.parent / "data" / "metabolites_hmdb_np_lipidmaps.parquet"
+
+# )
 
 # Renaming dictionaries for display purposes
 COLUMN_RENAMES_GRID = {
@@ -205,6 +238,7 @@ def dataset() -> pd.DataFrame:
     Return the current dataset, using the uploaded file if selected.
     Falls back to the default .parquet file if no upload is used.
     """
+
     def normalize_biological_columns(df: pd.DataFrame) -> pd.DataFrame:
         """
         # Convert biological property columns to plain lists
@@ -299,6 +333,10 @@ ui.tags.style("""
     overflow-x: hidden;
     flex-wrap: nowrap !important;
 }
+
+/* Force table headers in admin panel to left align */
+th { text-align: left !important; }
+td { text-align: left; }
 """)
 
 
@@ -514,7 +552,9 @@ with ui.navset_pill(id="main_tab"):
 
             # Plot card
             with ui.card(full_screen=True):
-                with ui.card_header(class_="d-flex justify-content-between align-items-center"):
+                with ui.card_header(
+                    class_="d-flex justify-content-between align-items-center"
+                ):
                     "Summary Statistics & Plots"
 
                     # Popover with plot type selector
@@ -533,10 +573,10 @@ with ui.navset_pill(id="main_tab"):
                     def value_counts_with_unclassified(series: pd.Series) -> pd.Series:
                         """
                         Count values in a Series and include an 'Not Classified' bar for empty or NaN entries.
-                        
+
                         Args:
                             series: The input Series to count values from.
-                        
+
                         Returns:
                             A Series of value counts
                         """
@@ -546,7 +586,6 @@ with ui.navset_pill(id="main_tab"):
                         if n_unclassified > 0:
                             counts["Not Classified"] = n_unclassified
                         return counts
-
 
                 @render_plotly
                 def summary_plot():
@@ -577,7 +616,9 @@ with ui.navset_pill(id="main_tab"):
 
                     # Bar chart: NP pathways
                     if plot_type == "pathway_bar":
-                        counts = value_counts_with_unclassified(df_plot["np_taxonomy_pathway"])
+                        counts = value_counts_with_unclassified(
+                            df_plot["np_taxonomy_pathway"]
+                        )
                         n = counts.sum()
 
                         fig = px.bar(
@@ -591,7 +632,9 @@ with ui.navset_pill(id="main_tab"):
 
                     # Bar chart: Lipid categories
                     elif plot_type == "lipid_bar":
-                        counts = value_counts_with_unclassified(df_plot["lm_taxonomy_category"])
+                        counts = value_counts_with_unclassified(
+                            df_plot["lm_taxonomy_category"]
+                        )
                         n = counts.sum()
 
                         fig = px.bar(
@@ -624,7 +667,6 @@ with ui.navset_pill(id="main_tab"):
                         )
 
                     return fig
-
 
         # ---------------------------------------
         # UI MIDDLE ROW: DataGrid
@@ -725,7 +767,9 @@ with ui.navset_pill(id="main_tab"):
 
                 # Show placeholder if no row is selected or the dataset is empty
                 if not selected_rows or df_display.empty:
-                    return ui.div("Select a row to see full details.", class_="text-muted mt-3")
+                    return ui.div(
+                        "Select a row to see full details.", class_="text-muted mt-3"
+                    )
 
                 # Extract the selected row
                 index = df_display.index[selected_rows[0]]
@@ -762,7 +806,9 @@ with ui.navset_pill(id="main_tab"):
                 def section_header(title: str):
                     return ui.tags.tr(
                         ui.tags.td(
-                            ui.tags.strong(title), colspan=2, style="background-color: #f0f8ff;"
+                            ui.tags.strong(title),
+                            colspan=2,
+                            style="background-color: #f0f8ff;",
                         )
                     )
 
@@ -783,7 +829,9 @@ with ui.navset_pill(id="main_tab"):
                     # Render known ID fields as clickable external links
                     if col == "HMDB ID" and pd.notna(val):
                         val = ui.a(
-                            val, href=f"https://hmdb.ca/metabolites/{val}", target="_blank"
+                            val,
+                            href=f"https://hmdb.ca/metabolites/{val}",
+                            target="_blank",
                         )
                     elif col == "LipidMaps ID" and pd.notna(val):
                         val = ui.a(
@@ -812,10 +860,16 @@ with ui.navset_pill(id="main_tab"):
                     elif col.startswith("Pathway") and not inserted_sections["NP"]:
                         table_rows.append(section_header("NP Taxonomy"))
                         inserted_sections["NP"] = True
-                    elif col.startswith("Category") and not inserted_sections["LipidMaps"]:
+                    elif (
+                        col.startswith("Category")
+                        and not inserted_sections["LipidMaps"]
+                    ):
                         table_rows.append(section_header("Lipid Maps Taxonomy"))
                         inserted_sections["LipidMaps"] = True
-                    elif col == "Cellular Locations" and not inserted_sections["Biological"]:
+                    elif (
+                        col == "Cellular Locations"
+                        and not inserted_sections["Biological"]
+                    ):
                         table_rows.append(section_header("Biological Properties"))
                         inserted_sections["Biological"] = True
 
@@ -831,9 +885,10 @@ with ui.navset_pill(id="main_tab"):
                             ui.tags.td(
                                 col,
                                 style=(
-                                    f"vertical-align: top; padding: 6px 12px; padding-left: {indent_px}px; width: 30%;" +
-                                    (
-                                        "" if any(
+                                    f"vertical-align: top; padding: 6px 12px; padding-left: {indent_px}px; width: 30%;"
+                                    + (
+                                        ""
+                                        if any(
                                             col.startswith(prefix)
                                             for prefix in [
                                                 "Kingdom",
@@ -866,12 +921,16 @@ with ui.navset_pill(id="main_tab"):
                     )
 
                 # Determine metabolite name for header (fallback to ID)
-                metabolite_name = row.get("Name") or row.get("HMDB ID") or "Selected Metabolite"
+                metabolite_name = (
+                    row.get("Name") or row.get("HMDB ID") or "Selected Metabolite"
+                )
 
                 # Final output: card title and table of details
                 return ui.div(
                     ui.div(
-                        ui.tags.h5(f"Full Details for {metabolite_name}", class_="mb-0"),
+                        ui.tags.h5(
+                            f"Full Details for {metabolite_name}", class_="mb-0"
+                        ),
                         class_="p-2",
                         style="background-color: #e6f2ff; border-radius: 5px;",
                     ),
@@ -881,22 +940,180 @@ with ui.navset_pill(id="main_tab"):
                     ),
                     class_="mt-2",
                 )
+
     # --------- Admin Panel Tab (via menu) ----------
-    with ui.nav_menu(title="", icon=icon_svg("ellipsis-vertical"), align='right'):
+    with ui.nav_menu(title="", icon=icon_svg("ellipsis-vertical"), align="right"):
         with ui.nav_panel("Admin Panel", value="admin"):
             ui.h3("Admin Panel")
             ui.p("This panel is for administrators only.")
 
             with ui.card():
+                ui.card_header([icon_svg("arrows-rotate"), " Check for Updates"])
+                ui.input_action_button(
+                    "check_updates", "Check for update", class_="btn-warning"
+                )
+
+                outdated_flag = reactive.Value(False)
+
+                @render.table
+                @reactive.event(input.check_updates)
+                def update_status():
+                    UA = "checker/0.8 (+https://example.local)"
+                    TIMEOUT = 30
+
+                    # Get local versions dynamically from the parquet filename
+                    parquet_path = str(DATA_PATH)  # your global Path object
+                    filename = os.path.basename(parquet_path)
+
+                    m = re.match(
+                        r"(\d{4}-\d{2}-\d{2})_hmdb_metabolites.*_lm_(\d{4}-\d{2}-\d{2})",
+                        filename,
+                    )
+                    if m:
+                        hmdb_version, lm_version = m.group(1), m.group(2)
+                    else:
+                        hmdb_version, lm_version = "unknown", "unknown"
+
+                    LOCAL_VERSIONS = {
+                        "HMDB": hmdb_version,
+                        "LIPID MAPS": lm_version,
+                    }
+
+                    # ---- Regex patterns to scrape remote versions ----
+                    TARGETS = [
+                        {
+                            "name": "HMDB",
+                            "url": "https://hmdb.ca/downloads",
+                            "pattern": r"All Metabolites</td><td>(\d{4}-\d{2}-\d{2})</td><td><a data-toggle=\"modal\" data-target=\"#downloadModal\" data-whatever=\"/system/downloads/current/hmdb_metabolites.zip\"",
+                        },
+                        {
+                            "name": "LIPID MAPS",
+                            "url": "https://lipidmaps.org/databases/lmsd/download",
+                            "pattern": r">LMSD\s+([\d-]+)\s+\(ZIP\)",
+                        },
+                    ]
+
+                    def fetch(url: str) -> str:
+                        req = urllib.request.Request(url, headers={"User-Agent": UA})
+                        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                            charset = resp.headers.get_content_charset() or "utf-8"
+                            return resp.read().decode(charset, errors="ignore")
+
+                    results = []
+                    any_outdated = False
+                    for t in TARGETS:
+                        local_version = LOCAL_VERSIONS.get(t["name"], "n/a")
+                        try:
+                            html = fetch(t["url"])
+                            m = re.search(t["pattern"], html, flags=re.IGNORECASE)
+                            if m:
+                                remote_version = m.group(1)
+                                status = (
+                                    "UP TO DATE"
+                                    if local_version == remote_version
+                                    else "OUTDATED"
+                                )
+                                if status == "OUTDATED":
+                                    any_outdated = True
+                                results.append(
+                                    {
+                                        "Database": t["name"],
+                                        "Local Version": local_version,
+                                        "Remote Version": remote_version,
+                                        "Status": status,
+                                    }
+                                )
+                            else:
+                                results.append(
+                                    {
+                                        "Database": t["name"],
+                                        "Local Version": local_version,
+                                        "Remote Version": "not found",
+                                        "Status": "ERROR: could not extract version",
+                                    }
+                                )
+                                any_outdated = True
+                        except Exception as e:
+                            results.append(
+                                {
+                                    "Database": t["name"],
+                                    "Local Version": local_version,
+                                    "Remote Version": "error",
+                                    "Status": f"ERROR: {e}",
+                                }
+                            )
+                            any_outdated = True
+
+                    outdated_flag.set(any_outdated)
+                    return pd.DataFrame(results)
+
+                # ---- Password + Update button (only if outdated) ----
+                @render.ui
+                def update_controls():
+                    if outdated_flag.get():
+                        return ui.div(
+                            ui.input_password("admin_pw", "Enter password:"),
+                            ui.input_action_button(
+                                "update_db", "Update Database", class_="btn-danger mt-2"
+                            ),
+                        )
+                    return None
+
+                # ---- Run pipeline when button pressed ----
+                @reactive.effect
+                @reactive.event(input.update_db)
+                def _():
+                    pw = input.admin_pw()
+                    if pw != "admin":
+                        ui.modal_show(
+                            ui.modal(
+                                "Incorrect password!", title="Error", easy_close=True
+                            )
+                        )
+                        return
+
+                    script_path = Path(__file__).parent / "run_pipeline.py"
+                    print("Launching pipeline at:", script_path)
+
+                    try:
+                        subprocess.Popen([sys.executable, str(script_path)])
+                        ui.modal_show(
+                            ui.modal(
+                                "Pipeline started successfully!",
+                                title="Success",
+                                easy_close=True,
+                            )
+                        )
+                    except Exception as e:
+                        ui.modal_show(
+                            ui.modal(
+                                f"Failed to start pipeline: {e}",
+                                title="Error",
+                                easy_close=True,
+                            )
+                        )
+
+            with ui.card():
                 ui.card_header([icon_svg("github"), " GitHub Repository"])
-                ui.p([
-                    "To update the main .parquet dataset, visit the ",
-                    ui.a("GitHub repository", href="https://github.com/peterk140360/Metabo-explorer", target="_blank"),
-                    "."
-                ])
+                ui.p(
+                    [
+                        "To manually update dataset visit the GitHub repository: ",
+                        ui.a(
+                            "GitHub repository",
+                            href="https://github.com/peterk140360/Metabo-explorer",
+                            target="_blank",
+                        ),
+                        ".",
+                    ]
+                )
 
             with ui.card(style="height: 200px"):
-                ui.card_header([icon_svg("upload"), " Upload a new .parquet file to inspect its structure"])
+                ui.card_header(
+                    [
+                        icon_svg("upload"),
+                        "Upload a new .parquet file to inspect its structure",
+                    ]
+                )
                 ui.input_file(
                     id="parquet_file",
                     label="Choose a .parquet file",
@@ -924,23 +1141,29 @@ with ui.navset_pill(id="main_tab"):
                     column_count = df.shape[1]
                     column_names = ", ".join(df.columns)
 
-                    return pd.DataFrame({
-                        "Row Count": [row_count],
-                        "Column Count": [column_count],
-                        "Column Names": [column_names],
-                    })
+                    return pd.DataFrame(
+                        {
+                            "Row Count": [row_count],
+                            "Column Count": [column_count],
+                            "Column Names": [column_names],
+                        }
+                    )
 
             with ui.card():
-                ui.input_action_button("upload_btn", "Use uploaded file", icon=icon_svg("upload"), class_="btn-primary")
+                ui.input_action_button(
+                    "upload_btn",
+                    "Use uploaded file",
+                    icon=icon_svg("upload"),
+                    class_="btn-primary",
+                )
+
                 @render.ui
                 def upload_status():
                     return ui.tags.div(
-                        "File uploaded successfully!",
-                        class_="text-success mt-2"
-                        )
+                        "File uploaded successfully!", class_="text-success mt-2"
+                    )
 
 
-# ---------------------------------------
 # Define UI Footer
 # ---------------------------------------
 ui.div(
