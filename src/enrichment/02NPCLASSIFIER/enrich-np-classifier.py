@@ -3,7 +3,7 @@
 # Company:     -
 # File:        enrich-np-classifier.py
 # created:     20.09.2025
-# edited:      -
+# edited:      22.09.2025
 #
 # Description: This script enriches HMDB metabolite data with natural product
 #              classification information using the NPClassifier API.
@@ -13,8 +13,9 @@
 #              threads.
 #
 #              For each metabolite:
-#                - The SMILES string is extracted.
-#                - If the SMILES is valid, the NPClassifier API is queried.
+#                - The SMILES string is extracted and safely URL-encoded.
+#                - If the SMILES is valid, the NPClassifier API is queried
+#                  using the encoded string.
 #                - NP taxonomy fields ("pathway", "super_class", "class") are
 #                  populated based on the API results.
 #                - Empty or missing fields are consistently stored as `None`.
@@ -39,10 +40,14 @@
 # Notes:       - Parallel processing is used to speed up API queries.
 #              - MAX_WORKERS can be adjusted for the number of threads.
 #              - The unwrap function ensures empty lists are converted to None.
+#              - All SMILES strings are URL-encoded before being sent to the API
+#                to prevent server errors due to reserved characters.
 ###############################################################################
+
 import os
 import json
 import requests
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from collections import Counter
@@ -98,8 +103,10 @@ def classify(index, entry):
         )
 
     smiles = smiles.strip()
+    encoded_smiles = urllib.parse.quote(smiles, safe="") # Encoded SMILES for URL
+
     try:
-        url = f"https://npclassifier.gnps2.org/classify?smiles={smiles}"
+        url = f"https://npclassifier.gnps2.org/classify?smiles={encoded_smiles}"
         response = requests.get(url, timeout=30)
 
         if response.status_code == 200:
