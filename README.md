@@ -25,10 +25,10 @@ This project is licensed under the terms of the [GNU General Public License v3.0
   Displays taxonomy and external database links for selected metabolites.  
 
 - **Admin Panel**  
-  - Upload and preview new Parquet datasets  
-  - Run the enrichment pipeline for dataset updates  
-  - Check online database versions against local files  
-  - Dynamic loading of datasets with automatic version parsing  
+  Upload and preview new Parquet datasets  
+  Run the enrichment pipeline for dataset updates  
+  Check online database versions against local files  
+  Dynamic loading of datasets with automatic version parsing  
 
 
 ## Recent Updates (2025-09-21)
@@ -58,7 +58,7 @@ This project is licensed under the terms of the [GNU General Public License v3.0
 Install the required dependencies before running the application:
 
 ```bash
-pip install shiny shinywidgets pandas numpy plotly faicons
+pip install shiny shinywidgets pandas numpy plotly faicons pyarrow fastparquet
 ```
 
 
