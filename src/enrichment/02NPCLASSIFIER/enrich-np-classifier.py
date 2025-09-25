@@ -106,7 +106,7 @@ def classify(index, entry):
     encoded_smiles = urllib.parse.quote(smiles, safe="") # Encoded SMILES for URL
 
     try:
-        url = f"https://npclassifier.ucsd.edu/classify?smiles={encoded_smiles}"
+        url = f"https://npclassifier.gnps2.org/classify?smiles={encoded_smiles}"
         response = requests.get(url, timeout=30)
 
         if response.status_code == 200:
@@ -220,4 +220,5 @@ if __name__ == "__main__":
         print("\n  Error breakdown:")
         for msg, count in error_counter.most_common():
             print(f"    - {msg}: {count}")
+
 
