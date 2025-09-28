@@ -1168,8 +1168,9 @@ with ui.navset_pill(id="main_tab"):
 # ---------------------------------------
 ui.div(
     ui.p(
-        "© 2025 HMDB Metabolite Explorer — Built with Shiny for Python", class_="mb-0"
+        "2025 HMDB Metabolite Explorer - Built with Shiny for Python - v1.0", class_="mb-0"
     ),
     class_="bg-light text-center text-muted p-3 mt-4 rounded",
     style="position: static; bottom: 0; z-index: 1000;",
 )
+
