@@ -1,0 +1,11 @@
+shiny
+shinywidgets
+plotly
+pandas
+numpy
+faicons
+pyarrow
+Jinja2
+requests
+tqdm
+rdkit
