@@ -123,7 +123,7 @@ if __name__ == "__main__":
     # Parquet output folder two levels up
     data_folder = Path(enrichment_root).parent.parent / "data"
     data_folder.mkdir(parents=True, exist_ok=True)  # Ensure the folder exists
-    parquet_file = data_folder / input_json.name.replace(".json", "_v6.parquet")
+    parquet_file = data_folder / input_json.name.replace(".json", ".parquet")
     
     # Force version suffix for testing
     # manual_suffix = "2021-11-16_hmdb_metabolites_classy_np_lm_2025-09-20"
@@ -162,3 +162,4 @@ if __name__ == "__main__":
     print(
         f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Triggered app reload by touching {app_file}"
     )
+
