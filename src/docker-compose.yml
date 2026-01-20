@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  metabo-explorer:
+    image: ghcr.io/peterk140360/metabo-explorer:1.0
+    container_name: metabo-explorer
+    restart: unless-stopped
+
+    ports:
+      - "3838:3838"
+
+    environment:
+      DATA_DIR: /data
+      PYTHONUNBUFFERED: "1"
+
+    volumes:
+      - /volume1/docker/metabo-explorer/data:/data
