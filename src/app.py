@@ -15,6 +15,8 @@
 #                           add update card in admin panel
 #                           run pipeline for dataset update
 #                           dynamic parquet file loading
+#              2026-01-01
+#                           add Admin panel and additional tissue filters
 #
 # Description: The "HMDB Metabolite Explorer" is a web-based interactive
 #              application built with Shiny for Python. It allows users to
@@ -402,13 +404,17 @@ with ui.navset_pill(id="main_tab"):
                                 label="",
                                 choices={
                                     "HMDB Cellular Locations": {
-                                        "Extracellular": "Extracellular",
-                                        "Lysosome": "Lysosome",
-                                        "Mitochondria": "Mitochondria",
-                                        "Nucleus": "Nucleus",
-                                        "Membrane": "Membrane",
                                         "Cytoplasm": "Cytoplasm",
                                         "Endoplasmic reticulum": "Endoplasmic reticulum",
+                                        "Extracellular": "Extracellular",
+                                        "Golgi apparatus": "Golgi apparatus",
+                                        "Inner mitochondrial membrane": "Inner mitochondrial membrane",
+                                        "Lysosome": "Lysosome",
+                                        "Membrane": "Membrane",
+                                        "Microsomes": "Microsomes",
+                                        "Mitochondria": "Mitochondria",
+                                        "Nucleus": "Nucleus",
+                                        "Peroxisome": "Peroxisome",
                                     }
                                 },
                                 multiple=True,
@@ -459,10 +465,23 @@ with ui.navset_pill(id="main_tab"):
                                 label="",
                                 choices={
                                     "HMDB Biospecimen Locations": {
+                                        "Amniotic Fluid": "Amniotic Fluid",
+                                        "Aqueous Humour": "Aqueous Humour",
+                                        "Ascites Fluid": "Ascites Fluid",
+                                        "Bile": "Bile",
                                         "Blood": "Blood",
+                                        "Breast Milk": "Breast Milk",
+                                        "Breath": "Breath",
+                                        "Cellular Cytoplasm": "Cellular Cytoplasm",
                                         "Cerebrospinal Fluid (CSF)": "Cerebrospinal Fluid (CSF)",
                                         "Feces": "Feces",
+                                        "Lymph": "Lymph",
+                                        "Pericardial Effusion": "Pericardial Effusion",
+                                        "Prostate Tissue": "Prostate Tissue",
                                         "Saliva": "Saliva",
+                                        "Semen": "Semen",
+                                        "Sweat": "Sweat",
+                                        "Tears": "Tears",
                                         "Urine": "Urine",
                                     }
                                 },
@@ -532,12 +551,48 @@ with ui.navset_pill(id="main_tab"):
                                 label="",
                                 choices={
                                     "HMDB Tissue Locations": {
+                                        "Adipose Tissue": "Adipose Tissue",
+                                        "Adrenal Cortex": "Adrenal Cortex",
                                         "Adrenal Gland": "Adrenal Gland",
+                                        "Adrenal Medulla": "Adrenal Medulla",
+                                        "All Tissues": "All Tissues",
+                                        "Basal Ganglia": "Basal Ganglia",
+                                        "Bile": "Bile",
+                                        "Bladder": "Bladder",
+                                        "Blood": "Blood",
+                                        "Bone Marrow": "Bone Marrow",
                                         "Brain": "Brain",
+                                        "Cartilage": "Cartilage",
                                         "Epidermis": "Epidermis",
+                                        "Erythrocyte": "Erythrocyte",
+                                        "Eye Lens": "Eye Lens",
                                         "Fibroblasts": "Fibroblasts",
+                                        "Gall Bladder": "Gall Bladder",
+                                        "Hair": "Hair",
+                                        "Heart": "Heart",
+                                        "Intestine": "Intestine",
+                                        "Kidney": "Kidney",
+                                        "Leukocyte": "Leukocyte",
                                         "Liver": "Liver",
+                                        "Lung": "Lung",
+                                        "Neuron": "Neuron",
+                                        "Ovary": "Ovary",
+                                        "Pancreas": "Pancreas",
+                                        "Parathyroid Gland": "Parathyroid Gland",
+                                        "Pineal Gland": "Pineal Gland",
+                                        "Placenta": "Placenta",
+                                        "Platelet": "Platelet",
+                                        "Prostate": "Prostate",
+                                        "Retina": "Retina",
+                                        "Semen": "Semen",
+                                        "Skeletal Muscle": "Skeletal Muscle",
+                                        "Smooth Muscle": "Smooth Muscle",
+                                        "Spleen": "Spleen",
                                         "Testis": "Testis",
+                                        "Thyroid Gland": "Thyroid Gland",
+                                        "Umbilical cord": "Umbilical cord",
+                                        "Urine": "Urine",
+                                        "Vitreous humor": "Vitreous humor",
                                     }
                                 },
                                 multiple=True,
@@ -942,226 +997,225 @@ with ui.navset_pill(id="main_tab"):
                 )
 
     # --------- Admin Panel Tab (via menu) ----------
-    with ui.nav_menu(title="", icon=icon_svg("ellipsis-vertical"), align="right"):
-        with ui.nav_panel("Admin Panel", value="admin"):
-            ui.h3("Admin Panel")
-            ui.p("This panel is for administrators only.")
+    with ui.nav_panel("Admin View", value="admin"):
+        ui.h3("Admin Panel")
+        ui.p("This panel is for administrators only.")
 
-            with ui.card():
-                ui.card_header([icon_svg("arrows-rotate"), " Check for Updates"])
-                ui.input_action_button(
-                    "check_updates", "Check for update", class_="btn-warning"
+        with ui.card():
+            ui.card_header([icon_svg("arrows-rotate"), " Check for Updates"])
+            ui.input_action_button(
+                "check_updates", "Check for update", class_="btn-warning"
+            )
+
+            outdated_flag = reactive.Value(False)
+
+            @render.table
+            @reactive.event(input.check_updates)
+            def update_status():
+                UA = "checker/0.8 (+https://example.local)"
+                TIMEOUT = 30
+
+                # Get local versions dynamically from the parquet filename
+                parquet_path = str(DATA_PATH)  # your global Path object
+                filename = os.path.basename(parquet_path)
+
+                m = re.match(
+                    r"(\d{4}-\d{2}-\d{2})_hmdb_metabolites.*_lm_(\d{4}-\d{2}-\d{2})",
+                    filename,
                 )
+                if m:
+                    hmdb_version, lm_version = m.group(1), m.group(2)
+                else:
+                    hmdb_version, lm_version = "unknown", "unknown"
 
-                outdated_flag = reactive.Value(False)
+                LOCAL_VERSIONS = {
+                    "HMDB": hmdb_version,
+                    "LIPID MAPS": lm_version,
+                }
 
-                @render.table
-                @reactive.event(input.check_updates)
-                def update_status():
-                    UA = "checker/0.8 (+https://example.local)"
-                    TIMEOUT = 30
+                # ---- Regex patterns to scrape remote versions ----
+                TARGETS = [
+                    {
+                        "name": "HMDB",
+                        "url": "https://hmdb.ca/downloads",
+                        "pattern": r"All Metabolites</td><td>(\d{4}-\d{2}-\d{2})</td><td><a data-toggle=\"modal\" data-target=\"#downloadModal\" data-whatever=\"/system/downloads/current/hmdb_metabolites.zip\"",
+                    },
+                    {
+                        "name": "LIPID MAPS",
+                        "url": "https://lipidmaps.org/databases/lmsd/download",
+                        "pattern": r">LMSD\s+([\d-]+)\s+\(ZIP\)",
+                    },
+                ]
 
-                    # Get local versions dynamically from the parquet filename
-                    parquet_path = str(DATA_PATH)  # your global Path object
-                    filename = os.path.basename(parquet_path)
+                def fetch(url: str) -> str:
+                    req = urllib.request.Request(url, headers={"User-Agent": UA})
+                    with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                        charset = resp.headers.get_content_charset() or "utf-8"
+                        return resp.read().decode(charset, errors="ignore")
 
-                    m = re.match(
-                        r"(\d{4}-\d{2}-\d{2})_hmdb_metabolites.*_lm_(\d{4}-\d{2}-\d{2})",
-                        filename,
-                    )
-                    if m:
-                        hmdb_version, lm_version = m.group(1), m.group(2)
-                    else:
-                        hmdb_version, lm_version = "unknown", "unknown"
-
-                    LOCAL_VERSIONS = {
-                        "HMDB": hmdb_version,
-                        "LIPID MAPS": lm_version,
-                    }
-
-                    # ---- Regex patterns to scrape remote versions ----
-                    TARGETS = [
-                        {
-                            "name": "HMDB",
-                            "url": "https://hmdb.ca/downloads",
-                            "pattern": r"All Metabolites</td><td>(\d{4}-\d{2}-\d{2})</td><td><a data-toggle=\"modal\" data-target=\"#downloadModal\" data-whatever=\"/system/downloads/current/hmdb_metabolites.zip\"",
-                        },
-                        {
-                            "name": "LIPID MAPS",
-                            "url": "https://lipidmaps.org/databases/lmsd/download",
-                            "pattern": r">LMSD\s+([\d-]+)\s+\(ZIP\)",
-                        },
-                    ]
-
-                    def fetch(url: str) -> str:
-                        req = urllib.request.Request(url, headers={"User-Agent": UA})
-                        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-                            charset = resp.headers.get_content_charset() or "utf-8"
-                            return resp.read().decode(charset, errors="ignore")
-
-                    results = []
-                    any_outdated = False
-                    for t in TARGETS:
-                        local_version = LOCAL_VERSIONS.get(t["name"], "n/a")
-                        try:
-                            html = fetch(t["url"])
-                            m = re.search(t["pattern"], html, flags=re.IGNORECASE)
-                            if m:
-                                remote_version = m.group(1)
-                                status = (
-                                    "UP TO DATE"
-                                    if local_version == remote_version
-                                    else "OUTDATED"
-                                )
-                                if status == "OUTDATED":
-                                    any_outdated = True
-                                results.append(
-                                    {
-                                        "Database": t["name"],
-                                        "Local Version": local_version,
-                                        "Remote Version": remote_version,
-                                        "Status": status,
-                                    }
-                                )
-                            else:
-                                results.append(
-                                    {
-                                        "Database": t["name"],
-                                        "Local Version": local_version,
-                                        "Remote Version": "not found",
-                                        "Status": "ERROR: could not extract version",
-                                    }
-                                )
+                results = []
+                any_outdated = False
+                for t in TARGETS:
+                    local_version = LOCAL_VERSIONS.get(t["name"], "n/a")
+                    try:
+                        html = fetch(t["url"])
+                        m = re.search(t["pattern"], html, flags=re.IGNORECASE)
+                        if m:
+                            remote_version = m.group(1)
+                            status = (
+                                "UP TO DATE"
+                                if local_version == remote_version
+                                else "OUTDATED"
+                            )
+                            if status == "OUTDATED":
                                 any_outdated = True
-                        except Exception as e:
                             results.append(
                                 {
                                     "Database": t["name"],
                                     "Local Version": local_version,
-                                    "Remote Version": "error",
-                                    "Status": f"ERROR: {e}",
+                                    "Remote Version": remote_version,
+                                    "Status": status,
+                                }
+                            )
+                        else:
+                            results.append(
+                                {
+                                    "Database": t["name"],
+                                    "Local Version": local_version,
+                                    "Remote Version": "not found",
+                                    "Status": "ERROR: could not extract version",
                                 }
                             )
                             any_outdated = True
-
-                    outdated_flag.set(any_outdated)
-                    return pd.DataFrame(results)
-
-                # ---- Password + Update button (only if outdated) ----
-                @render.ui
-                def update_controls():
-                    if outdated_flag.get():
-                        return ui.div(
-                            ui.input_password("admin_pw", "Enter password:"),
-                            ui.input_action_button(
-                                "update_db", "Update Database", class_="btn-danger mt-2"
-                            ),
-                        )
-                    return None
-
-                # ---- Run pipeline when button pressed ----
-                @reactive.effect
-                @reactive.event(input.update_db)
-                def _():
-                    pw = input.admin_pw()
-                    if pw != "admin":
-                        ui.modal_show(
-                            ui.modal(
-                                "Incorrect password!", title="Error", easy_close=True
-                            )
-                        )
-                        return
-
-                    script_path = Path(__file__).parent / "run_pipeline.py"
-                    print("Launching pipeline at:", script_path)
-
-                    try:
-                        subprocess.Popen([sys.executable, str(script_path)])
-                        ui.modal_show(
-                            ui.modal(
-                                "Pipeline started successfully!",
-                                title="Success",
-                                easy_close=True,
-                            )
-                        )
                     except Exception as e:
-                        ui.modal_show(
-                            ui.modal(
-                                f"Failed to start pipeline: {e}",
-                                title="Error",
-                                easy_close=True,
-                            )
+                        results.append(
+                            {
+                                "Database": t["name"],
+                                "Local Version": local_version,
+                                "Remote Version": "error",
+                                "Status": f"ERROR: {e}",
+                            }
                         )
+                        any_outdated = True
 
-            with ui.card():
-                ui.card_header([icon_svg("github"), " GitHub Repository"])
-                ui.p(
-                    [
-                        "To manually update dataset visit the GitHub repository: ",
-                        ui.a(
-                            "GitHub repository",
-                            href="https://github.com/peterk140360/Metabo-explorer",
-                            target="_blank",
+                outdated_flag.set(any_outdated)
+                return pd.DataFrame(results)
+
+            # ---- Password + Update button (only if outdated) ----
+            @render.ui
+            def update_controls():
+                if outdated_flag.get():
+                    return ui.div(
+                        ui.input_password("admin_pw", "Enter password:"),
+                        ui.input_action_button(
+                            "update_db", "Update Database", class_="btn-danger mt-2"
                         ),
-                        ".",
-                    ]
-                )
+                    )
+                return None
 
-            with ui.card(style="height: 200px"):
-                ui.card_header(
-                    [
-                        icon_svg("upload"),
-                        "Upload a new .parquet file to inspect its structure",
-                    ]
-                )
-                ui.input_file(
-                    id="parquet_file",
-                    label="Choose a .parquet file",
-                    accept=[".parquet"],
-                    multiple=False,
-                    width="100%",
-                    placeholder="No file selected",
-                )
+            # ---- Run pipeline when button pressed ----
+            @reactive.effect
+            @reactive.event(input.update_db)
+            def _():
+                pw = input.admin_pw()
+                if pw != "admin":
+                    ui.modal_show(
+                        ui.modal(
+                            "Incorrect password!", title="Error", easy_close=True
+                        )
+                    )
+                    return
 
-            with ui.card(style="height: 300px; overflow-y: auto;"):
-                ui.card_header([icon_svg("eye"), " Preview Summary"])
+                script_path = Path(__file__).parent / "run_pipeline.py"
+                print("Launching pipeline at:", script_path)
 
-                @render.table
-                def parquet_summary():
-                    file_info = input.parquet_file()
-                    if file_info is None:
-                        return pd.DataFrame({"Message": ["No file uploaded."]})
-
-                    try:
-                        df = pd.read_parquet(file_info[0]["datapath"])
-                    except Exception as e:
-                        return pd.DataFrame({"Error": [str(e)]})
-
-                    row_count = df.shape[0]
-                    column_count = df.shape[1]
-                    column_names = ", ".join(df.columns)
-
-                    return pd.DataFrame(
-                        {
-                            "Row Count": [row_count],
-                            "Column Count": [column_count],
-                            "Column Names": [column_names],
-                        }
+                try:
+                    subprocess.Popen([sys.executable, str(script_path)])
+                    ui.modal_show(
+                        ui.modal(
+                            "Pipeline started successfully!",
+                            title="Success",
+                            easy_close=True,
+                        )
+                    )
+                except Exception as e:
+                    ui.modal_show(
+                        ui.modal(
+                            f"Failed to start pipeline: {e}",
+                            title="Error",
+                            easy_close=True,
+                        )
                     )
 
-            with ui.card():
-                ui.input_action_button(
-                    "upload_btn",
-                    "Use uploaded file",
-                    icon=icon_svg("upload"),
-                    class_="btn-primary",
+        with ui.card():
+            ui.card_header([icon_svg("github"), " GitHub Repository"])
+            ui.p(
+                [
+                    "To manually update dataset visit the GitHub repository: ",
+                    ui.a(
+                        "GitHub repository",
+                        href="https://github.com/peterk140360/Metabo-explorer",
+                        target="_blank",
+                    ),
+                    ".",
+                ]
+            )
+
+        with ui.card(style="height: 200px"):
+            ui.card_header(
+                [
+                    icon_svg("upload"),
+                    "Upload a new .parquet file to inspect its structure",
+                ]
+            )
+            ui.input_file(
+                id="parquet_file",
+                label="Choose a .parquet file",
+                accept=[".parquet"],
+                multiple=False,
+                width="100%",
+                placeholder="No file selected",
+            )
+
+        with ui.card(style="height: 300px; overflow-y: auto;"):
+            ui.card_header([icon_svg("eye"), " Preview Summary"])
+
+            @render.table
+            def parquet_summary():
+                file_info = input.parquet_file()
+                if file_info is None:
+                    return pd.DataFrame({"Message": ["No file uploaded."]})
+
+                try:
+                    df = pd.read_parquet(file_info[0]["datapath"])
+                except Exception as e:
+                    return pd.DataFrame({"Error": [str(e)]})
+
+                row_count = df.shape[0]
+                column_count = df.shape[1]
+                column_names = ", ".join(df.columns)
+
+                return pd.DataFrame(
+                    {
+                        "Row Count": [row_count],
+                        "Column Count": [column_count],
+                        "Column Names": [column_names],
+                    }
                 )
 
-                @render.ui
-                def upload_status():
-                    return ui.tags.div(
-                        "File uploaded successfully!", class_="text-success mt-2"
-                    )
+        with ui.card():
+            ui.input_action_button(
+                "upload_btn",
+                "Use uploaded file",
+                icon=icon_svg("upload"),
+                class_="btn-primary",
+            )
+
+            @render.ui
+            def upload_status():
+                return ui.tags.div(
+                    "File uploaded successfully!", class_="text-success mt-2"
+                )
 
 
 # Define UI Footer
@@ -1173,4 +1227,3 @@ ui.div(
     class_="bg-light text-center text-muted p-3 mt-4 rounded",
     style="position: static; bottom: 0; z-index: 1000;",
 )
-
