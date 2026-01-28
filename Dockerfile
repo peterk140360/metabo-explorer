@@ -1,9 +1,13 @@
-FROM python:3.10-slim
+# =========================
+# Base image
+# =========================
+FROM python:3.12-slim-bookworm
 
-# System dependencies (needed esp. for rdkit)
+# =========================
+# System dependencies
+# =========================
 RUN apt-get update && apt-get install -y \
     build-essential \
-    ca-certificates \
     curl \
     libglib2.0-0 \
     libxrender1 \
@@ -11,24 +15,34 @@ RUN apt-get update && apt-get install -y \
     libsm6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /app
+# =========================
+# App directory
+# =========================
+WORKDIR /app/src
 
-# Copy dependency file first (better Docker caching)
-COPY requirements.txt .
+# =========================
+# Python dependencies
+# =========================
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
+# =========================
 # Copy application code
-COPY src/ ./src/
+# =========================
+COPY src/ /app/src/
 
-# Expose Shiny port
-EXPOSE 3838
-
-# Environment defaults
-ENV DATA_DIR=/data
+# =========================
+# Runtime configuration
+# =========================
+ENV DATA_DIR=/app/data
 ENV PYTHONUNBUFFERED=1
 
-# Start the Shiny app
-CMD ["shiny", "run", "--host", "0.0.0.0", "--port", "3838", "src/app.py"]
+# =========================
+# Shiny port
+# =========================
+EXPOSE 3838
+
+# =========================
+# Start Shiny app
+# =========================
+CMD ["shiny", "run", "--host", "0.0.0.0", "--port", "3838", "app.py"]
