@@ -61,13 +61,39 @@ Install the required dependencies before running the application:
 pip install shiny shinywidgets pandas numpy plotly faicons pyarrow fastparquet
 ```
 
+## Docker Usage
 
+Clone the repository
+```bash
+git clone https://github.com/peterk140360/metabo-explorer.git
+cd metabo-explorer
+```
+
+Build the image
+```bash
+docker build -t metabo-explorer:latest .
+```
+
+Run container
+```bash
+docker run -d --name metabo-explorer \
+  -p 3838:3838 \
+  -v /home/<user>/Metaboexplorer/data:/app/data \
+  --restart unless-stopped \
+  metabo-explorer:latest
+```
+
+Check log
+```bash
+docker logs -f metabo-explorer
+```
 
 ## To Do
 
 - Freeze/fix first column in the DataGrid  
 - Adopt the url in the collect-raw-data.py script from csf_ to hmdb_
 - Implement console view in admin panel to show output of the pipeline run
+- Check the remote server version error for updating the dataset
 
 
 ## Resources
