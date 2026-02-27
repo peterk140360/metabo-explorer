@@ -78,7 +78,7 @@ Run container
 ```bash
 docker run -d --name metabo-explorer \
   -p 3838:3838 \
-  -v /home/<user>/Metaboexplorer/data:/app/data \
+  -v /home/<user>/metabo-explorer/data:/app/data \
   --restart unless-stopped \
   metabo-explorer:latest
 ```
